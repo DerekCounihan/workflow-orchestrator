@@ -212,6 +212,74 @@ phases:
     depends_on: ["0a"]
 
     steps:
+      - id: "0b.0"
+        name: "Deep Codebase Investigation"
+        type: "command"
+        prompt: |
+          ## MANDATORY: Deep Codebase Investigation
+
+          Before any planning, you MUST investigate the codebase thoroughly.
+          Poor investigation leads to plans that don't match codebase patterns.
+
+          ### Step 1: Understand Project Structure
+
+          ```bash
+          # Get directory structure
+          find . -type f \( -name "*.ts" -o -name "*.tsx" \) | head -100
+          ls -la apps/ packages/ src/ 2>/dev/null || true
+          ```
+
+          ### Step 2: Find Similar Implementations
+
+          For feature: {feature_description}
+
+          Search for SIMILAR existing features:
+          ```bash
+          # Find related code
+          rg "{relevant_keyword}" --type ts -l | head -20
+          ```
+
+          ### Step 3: Read Pattern Files (MANDATORY)
+
+          You MUST read at least 3 pattern files:
+          1. A file with similar functionality
+          2. A file in the same service you'll modify
+          3. A configuration file for relevant technology
+
+          ### Step 4: Document Findings
+
+          Create {output_dir}/codebase-context.md with:
+
+          ```markdown
+          # Codebase Context
+
+          ## Project Structure
+          - Entry points: [list]
+          - Key directories: [list]
+
+          ## Existing Patterns Found
+          | Pattern | File | Description |
+          |---------|------|-------------|
+
+          ## Similar Features
+          | Feature | Files | Relevance |
+          |---------|-------|-----------|
+
+          ## Technology Stack
+          - [tech]: [config location]
+
+          ## Conventions Observed
+          - Naming: [pattern]
+          - File structure: [pattern]
+          - Testing: [pattern]
+          ```
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 5
+        completion_criteria:
+          type: "file_exists"
+          path: "{output_dir}/codebase-context.md"
+
       - id: "0b.1"
         name: "Library Research"
         type: "agents"
@@ -221,11 +289,13 @@ phases:
             prompt: |
               Research relevant libraries for implementing: {feature_description}
 
+              First, read {output_dir}/codebase-context.md to understand what's already in use.
+
               Use Context7 to:
-              1. Resolve library IDs for relevant packages
+              1. Resolve library IDs for packages mentioned in codebase-context.md
               2. Query documentation for patterns, APIs, edge cases
 
-              Focus on libraries already used in the codebase.
+              Focus on libraries ALREADY used in the codebase.
 
               Return:
               ## Libraries Researched
@@ -449,39 +519,62 @@ phases:
           path: "{output_dir}/proposal.md"
 
       - id: "1.3"
-        name: "Create Tasks"
-        type: "command"
-        prompt: |
-          Create tasks.md at {output_dir}/tasks.md using TDD approach.
+        name: "Create Implementation Plan"
+        type: "agents"
+        agents:
+          - subagent_type: "implementation-planner"
+            prompt: |
+              Create a structured implementation plan for: {feature_description}
 
-          Structure with tests interleaved after implementation sections:
+              Read these inputs:
+              - {output_dir}/prd.md (product requirements)
+              - {output_dir}/research-findings.md (codebase patterns)
+              - {output_dir}/technical-decisions.md (developer answers)
 
-          ## 0. Infrastructure (if needed)
-          - [ ] 0.1 [Setup task]
+              ## Step 1: Determine Workflow Type
 
-          ## 1. Models & DTOs
-          - [ ] 1.1 Create schema...
-          - [ ] 1.2 Create types...
+              Based on the feature, select:
+              - **feature**: Multi-service new functionality
+              - **refactor**: Stage-based changes to existing code
+              - **investigation**: Bug hunting (if this is a fix)
+              - **migration**: Data pipeline changes
+              - **simple**: Single-service quick tasks
 
-          ## 2. Model Tests (TDD)
-          - [ ] 2.1 Write schema validation tests
-          - [ ] 2.2 Run tests - verify pass
+              ## Step 2: Assess Risk Level
 
-          ## 3. Store Services
-          - [ ] 3.1 Implement store methods
-          - [ ] 3.2 **Tests**: Write store service unit tests
-          - [ ] 3.3 Run tests - verify pass
+              Evaluate complexity:
+              - **low**: Single file, no behavior change
+              - **medium**: Multiple files, behavior change
+              - **high**: Cross-service, user-facing
+              - **critical**: Auth, payments, data migration
 
-          [Continue pattern: implement → test → verify]
+              ## Step 3: Create Phased Subtasks
 
-          ## 99. Validation (REQUIRED)
-          [Will be filled by validate-spec]
+              Break down into phases with subtasks. Each subtask must have:
+              - **service**: Which service (backend, frontend, worker)
+              - **files_to_modify**: Existing files to change
+              - **files_to_create**: New files to add
+              - **patterns_from**: Reference files for patterns
+              - **verification**: How to verify it works
 
-          When complete, output: <promise>STEP_COMPLETE</promise>
-        max_iterations: 3
+              ## Step 4: Analyze Parallelism
+
+              Identify which phases can run in parallel:
+              - Same dependencies + different files = parallel safe
+              - Different services = usually parallel safe
+
+              ## Output
+
+              Create two files:
+
+              1. `{output_dir}/implementation-plan.json` - Structured JSON plan
+              2. `{output_dir}/tasks.md` - Human-readable task list
+
+              When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 5
         completion_criteria:
           type: "file_exists"
-          path: "{output_dir}/tasks.md"
+          path: "{output_dir}/implementation-plan.json"
 
       - id: "1.4"
         name: "Create Spec Deltas"
