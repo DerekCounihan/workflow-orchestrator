@@ -33,12 +33,14 @@ Before anything else, determine which mode you're in:
 
 Before any validation, load all context:
 
-**Read these files:**
-1. `{output_dir}/tasks.md` - The task list with checkboxes
-2. `{output_dir}/memory/session-log.md` - Implementation progress
-3. `{output_dir}/memory/gotchas.md` - Known issues
-4. `{output_dir}/memory/patterns.md` - Patterns discovered
-5. `{output_dir}/prd.md` - Product requirements
+**Read these files (if they exist):**
+1. `{output_dir}/tasks.md` - The task list with checkboxes (REQUIRED)
+2. `{output_dir}/memory/session-log.md` - Implementation progress (optional)
+3. `{output_dir}/memory/gotchas.md` - Known issues (optional)
+4. `{output_dir}/memory/patterns.md` - Patterns discovered (optional)
+5. `{output_dir}/prd.md` - Product requirements (REQUIRED)
+
+**Note**: Memory files may not exist if implementation just started. Continue without them.
 
 **Find changed files:**
 - If in a git repo, run `git diff main --name-only` or `git diff HEAD~10 --name-only`
@@ -343,10 +345,18 @@ pnpm test -- --testPathPattern="[relevant-test]"
 
 Append to `{output_dir}/memory/session-log.md`:
 ```
-### QA Fix: [Issue Title]
+### Subtask QA Fix Complete
+- Issue: [title]
 - File: [path]
 - Change: [what you did]
 - Verified: [how]
+```
+
+If you learned something reusable, also append to `{output_dir}/memory/gotchas.md`:
+```
+### Gotcha: [Issue from QA]
+- **Symptom**: What QA found wrong
+- **Fix**: How it was resolved
 ```
 
 ---
