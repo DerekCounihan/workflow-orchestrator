@@ -135,12 +135,36 @@ phases:
 
           **Summary**: {prd_summary}
           **Scenarios**: {scenario_count} scenarios, {edge_case_count} edge cases
-          **Open Questions**: {open_questions}
 
-          Please review and:
-          1. Answer the open questions
-          2. Flag any missing scenarios or edge cases
-          3. Provide any tech steer that might affect PRODUCT scope
+          Use the **AskUserQuestion** tool to gather feedback interactively:
+
+          ```json
+          {
+            "questions": [
+              {
+                "question": "Does the PRD accurately capture the feature requirements?",
+                "header": "PRD Review",
+                "multiSelect": false,
+                "options": [
+                  { "label": "Yes, looks good", "description": "PRD captures requirements correctly" },
+                  { "label": "Minor tweaks needed", "description": "Small adjustments to scenarios or edge cases" },
+                  { "label": "Major changes needed", "description": "Significant gaps or misunderstandings to address" }
+                ]
+              },
+              {
+                "question": "Are there any missing scenarios or edge cases?",
+                "header": "Scenarios",
+                "multiSelect": false,
+                "options": [
+                  { "label": "No, complete", "description": "All important scenarios are covered" },
+                  { "label": "Yes, add some", "description": "I'll describe what's missing" }
+                ]
+              }
+            ]
+          }
+          ```
+
+          Based on answers, either proceed or update the PRD.
         required_response: true
         collect_answers: true
         timeout_action: "pause"
@@ -150,14 +174,29 @@ phases:
         type: "checkpoint"
         gate: "questions"
         prompt: |
-          Before I finalize the PRD, do you have any tech steer that affects PRODUCT scope?
+          Before finalizing the PRD, check for tech steer that affects PRODUCT scope.
 
-          Examples of scope-changing tech steer:
-          - "We already have X feature, just extend it" → Reduces PRD scope
-          - "We need to support Y as well" → Adds to PRD scope
-          - "That edge case is handled globally" → Remove from PRD
+          Use the **AskUserQuestion** tool:
 
-          (Or say "no changes needed" to continue)
+          ```json
+          {
+            "questions": [
+              {
+                "question": "Do you have any tech steer that affects the PRD scope?",
+                "header": "Tech Steer",
+                "multiSelect": false,
+                "options": [
+                  { "label": "No changes needed", "description": "PRD scope is correct, proceed to technical research" },
+                  { "label": "Reduce scope", "description": "We already have X feature, just extend it" },
+                  { "label": "Expand scope", "description": "We need to support additional cases" },
+                  { "label": "Remove edge case", "description": "That edge case is handled globally elsewhere" }
+                ]
+              }
+            ]
+          }
+          ```
+
+          If user selects anything other than "No changes needed", ask for details.
         optional: true
         default_response: "no changes needed"
 
@@ -197,10 +236,29 @@ phases:
 
           **Status**: Ready for final approval
 
-          Please respond:
-          - "PRD approved" / "Approved" / "LGTM" → Continue to technical research
-          - "Changes needed: [describe]" → I'll update the PRD
-        required_keywords: ["approved", "lgtm", "proceed", "continue"]
+          Use the **AskUserQuestion** tool:
+
+          ```json
+          {
+            "questions": [
+              {
+                "question": "Is the PRD approved to proceed to technical research?",
+                "header": "PRD Approval",
+                "multiSelect": false,
+                "options": [
+                  { "label": "Approved", "description": "PRD is complete, proceed to technical research" },
+                  { "label": "Minor changes", "description": "Small tweaks needed before proceeding" },
+                  { "label": "Major revision", "description": "Significant changes required, return to PRD review" }
+                ]
+              }
+            ]
+          }
+          ```
+
+          - If "Approved" → Continue to Phase 0b (Technical Research)
+          - If "Minor changes" → Ask for details and update PRD
+          - If "Major revision" → Return to step 0a.4
+        required_keywords: ["approved"]
         on_rejected: "goto:0a.4"
 
 # =============================================================================
@@ -413,10 +471,41 @@ phases:
           **Key Findings**:
           - [Summary of research]
 
-          **Questions**:
-          {generated_questions}
+          For EACH question, use the **AskUserQuestion** tool with appropriate options.
 
-          Please answer ALL questions before I proceed. I cannot write accurate specs without your input.
+          Example for a typical architectural question:
+
+          ```json
+          {
+            "questions": [
+              {
+                "question": "Should we extend the existing ChallengeService or create a new dedicated service?",
+                "header": "Service",
+                "multiSelect": false,
+                "options": [
+                  { "label": "Extend existing", "description": "Add methods to ChallengeService (less code, shared context)" },
+                  { "label": "Create new service", "description": "Dedicated service (cleaner separation, more flexibility)" },
+                  { "label": "Other approach", "description": "I have a different idea" }
+                ]
+              },
+              {
+                "question": "What storage approach for the new data?",
+                "header": "Storage",
+                "multiSelect": false,
+                "options": [
+                  { "label": "New collection", "description": "Dedicated MongoDB collection" },
+                  { "label": "Embed in existing", "description": "Add fields to existing documents" },
+                  { "label": "Redis cache", "description": "Use Redis for ephemeral data" }
+                ]
+              }
+            ]
+          }
+          ```
+
+          **Important**: Batch related questions (up to 4 per call) for efficiency.
+          Present questions in priority order: architecture → data → integration → edge cases.
+
+          After collecting all answers, proceed to document them.
         required_response: true
         collect_answers: true
         min_answers: "{question_count}"
@@ -836,10 +925,31 @@ phases:
           - Tech Steer: {tech_steer_status}
           - Final Review: {final_review_status}
 
-          Please review and respond:
-          - "Approved" / "LGTM" / "Proceed" → Continue to implementation
-          - "Rejected" / "Changes needed: [describe]" → I'll update
-        required_keywords: ["approved", "lgtm", "proceed"]
+          Use the **AskUserQuestion** tool:
+
+          ```json
+          {
+            "questions": [
+              {
+                "question": "Is the proposal approved to proceed to implementation?",
+                "header": "Approval",
+                "multiSelect": false,
+                "options": [
+                  { "label": "Approved", "description": "Proposal is ready, proceed to implementation" },
+                  { "label": "Minor adjustments", "description": "Small tweaks to tasks or specs needed" },
+                  { "label": "Major changes", "description": "Significant revisions required, return to spec phase" },
+                  { "label": "Rejected", "description": "Fundamental issues, restart from PRD" }
+                ]
+              }
+            ]
+          }
+          ```
+
+          - If "Approved" → Continue to Phase 2 (Implementation)
+          - If "Minor adjustments" → Ask for details and apply fixes
+          - If "Major changes" → Return to Phase 1 (Scaffolding)
+          - If "Rejected" → Return to Phase 0a (PRD)
+        required_keywords: ["approved"]
         on_rejected: "goto:1"
         on_approved: "goto:2"
 
