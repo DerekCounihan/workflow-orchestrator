@@ -957,12 +957,49 @@ phases:
         max_iterations: 100
 
 # =============================================================================
+# PHASE 2.5: QA Validation
+# =============================================================================
+  - id: "2.5"
+    name: "QA Validation"
+    description: "Validate implementation is complete, correct, and production-ready"
+    depends_on: ["2"]
+
+    steps:
+      - id: "2.5.1"
+        name: "Run QA Validation"
+        type: "agents"
+        agents:
+          - subagent_type: "qa-validator"
+            prompt: |
+              Validate the implementation at {output_dir}/
+
+              ## Context Files
+              - `{output_dir}/tasks.md` - verify all subtasks are [x]
+              - `{output_dir}/memory/` - patterns, gotchas, session log
+              - `{output_dir}/prd.md` - product requirements
+
+              ## Your Mission
+              1. Verify ALL tasks are marked complete
+              2. Run full test suite
+              3. Check for security issues
+              4. Validate third-party API usage with Context7
+              5. Generate qa-report.md with APPROVED/REJECTED verdict
+
+              If ALL checks pass, output: <promise>STEP_COMPLETE</promise>
+              If ANY critical issues, describe fixes needed (do NOT output STEP_COMPLETE)
+        gate_checks:
+          type: "full-suite"
+          on_failure: "block"
+        stop_gate: true
+        max_iterations: 10
+
+# =============================================================================
 # PHASE 3: Archive
 # =============================================================================
   - id: "3"
     name: "Archive"
     description: "Archive the completed change"
-    depends_on: ["2"]
+    depends_on: ["2.5"]
     trigger: "manual"
 
     steps:
