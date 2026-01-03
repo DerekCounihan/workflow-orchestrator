@@ -4,7 +4,7 @@
   "description": "Workflow orchestration plugins for Claude Code",
   "owner": {
     "name": "Derek Counihan",
-    "email": "derek@wenudj.cx"
+    "email": "derek@wenudj.com"
   },
   "plugins": [
     {
