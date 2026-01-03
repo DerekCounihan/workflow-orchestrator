@@ -66,48 +66,15 @@ phases:
         type: "agents"
         parallel: true
         agents:
-          - subagent_type: "product-domain-specialist"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/product-domain-specialist.md"
             prompt: |
               Analyze product requirements for: {feature_description}
 
-              Your role:
-              1. Map user requirements to platform concepts
-              2. Research competitor patterns via WebSearch
-              3. Clarify terminology (what user terms mean in platform context)
-
-              Focus on USER EXPERIENCE only - NO technical suggestions.
-
-              Return structured output:
-              ## Platform Mapping
-              | User Concept | Platform Entity | Notes |
-
-              ## Industry Insights
-              - Competitor patterns
-
-              ## Open Questions
-              - Product scope questions
-
-          - subagent_type: "product-edge-case-analyst"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/product-edge-case-analyst.md"
             prompt: |
               Identify edge cases for: {feature_description}
-
-              Your role:
-              1. Define the happy path (what user does → what user sees)
-              2. Identify edge cases by category
-              3. Research how competitors handle failures
-              4. Create priority matrix (P0/P1/P2)
-
-              Focus on USER EXPERIENCE only - NO technical solutions.
-
-              Return structured output:
-              ## Happy Path
-              | Step | User Action | User Experience |
-
-              ## Edge Cases
-              | Priority | Scenario | Trigger | User Experience |
-
-              ## Industry Patterns
-              - How competitors handle similar edge cases
 
         max_iterations: 3
         completion_criteria:
@@ -277,68 +244,20 @@ phases:
         type: "agents"
         parallel: true
         agents:
-          - subagent_type: "codebase-pattern-analyzer"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/codebase-pattern-analyzer.md"
             prompt: |
               Analyze codebase patterns for: {feature_description}
 
-              Use Glob/Grep to find:
-              1. Similar feature implementations
-              2. File organization patterns
-              3. Service layer patterns
-              4. Data flow patterns
-
-              Return:
-              ## Files Identified
-              - [actual file path]: [what it does, why relevant]
-
-              ## Existing Patterns
-              - [Pattern name]: Used in [file:line] - [description]
-
-              ## Similar Features
-              - [Feature]: Implemented in [files] - [how it's done]
-
-          - subagent_type: "architecture-reviewer"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/architecture-reviewer.md"
             prompt: |
               Review architecture for: {feature_description}
 
-              Validate:
-              1. File placement (per review-context.md)
-              2. Service layer patterns
-              3. Schema locations
-              4. Module boundaries
-
-              Return:
-              ## Recommended File Locations
-              | Component | Path | Rationale |
-
-              ## Service Layer Pattern
-              - tRPC endpoint → service → store service
-
-              ## Potential Concerns
-              - [Architecture issues to address]
-
-          - subagent_type: "backend-integration-analyst"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/backend-integration-analyst.md"
             prompt: |
               Analyze backend integrations for: {feature_description}
-
-              Research:
-              1. Data operations (CRUD, queries)
-              2. Caching strategies (CacheTag.*)
-              3. Event patterns (what events to emit)
-              4. Webhook integrations
-
-              Return:
-              ## Data Operations
-              - [Operation]: [Collection/Service]
-
-              ## Caching
-              - [Cache tag]: [Purpose]
-
-              ## Events
-              - [Event name]: [When to emit]
-
-              ## Webhooks
-              - [Webhook]: [Trigger condition]
 
         max_iterations: 3
         completion_criteria:
@@ -642,15 +561,20 @@ phases:
         agent_count: 5
         agent_selection: "dynamic"
         agent_pool:
-          - subagent_type: "accuracy-validator"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/accuracy-validator.md"
             focus: "api-database"
-          - subagent_type: "accuracy-validator"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/accuracy-validator.md"
             focus: "events-webhooks"
-          - subagent_type: "accuracy-validator"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/accuracy-validator.md"
             focus: "caching"
-          - subagent_type: "accuracy-validator"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/accuracy-validator.md"
             focus: "testing"
-          - subagent_type: "accuracy-validator"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/accuracy-validator.md"
             focus: "ui-frontend"
         prompt_template: |
           Validate accuracy for {focus} aspects of the spec.
@@ -660,17 +584,6 @@ phases:
           - {output_dir}/specs/*/spec.md
           - {output_dir}/prd.md
           - {output_dir}/technical-decisions.md
-
-          For each claim, verify against actual codebase.
-
-          Return MAX 10 inaccuracies:
-          ## Accuracy Report: {focus}
-
-          ### Inaccuracies Found
-          1. **INACCURACY**: [Section X.X]
-             - **Claim**: "[what the spec says]"
-             - **Actual**: [what the codebase shows] at [file:line]
-             - **Fix**: [how to correct]
         max_findings_per_agent: 10
         max_iterations: 3
         completion_criteria:
@@ -731,11 +644,14 @@ phases:
         parallel: true
         agent_count: 3
         agent_pool:
-          - subagent_type: "tech-steer-validator"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/tech-steer-validator.md"
             focus: "architecture"
-          - subagent_type: "tech-steer-validator"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/tech-steer-validator.md"
             focus: "schema-data"
-          - subagent_type: "tech-steer-validator"
+          - subagent_type: "general-purpose"
+            prompt_file: "agents/tech-steer-validator.md"
             focus: "integration"
         prompt_template: |
           Validate tech steer compliance for {focus}.
@@ -743,15 +659,6 @@ phases:
           Source of truth: Developer quotes from {output_dir}/technical-decisions.md
 
           Compare against tasks.md and spec.md.
-
-          Return MAX 10 deviations:
-          ## Tech Steer Compliance: {focus}
-
-          ### Deviations Found
-          1. **DEVIATION**: Developer said "[quote]"
-             - **In tasks.md**: [what the spec says]
-             - **Developer quote**: "[exact quote]"
-             - **Fix**: [how to align with developer guidance]
         max_findings_per_agent: 10
         max_iterations: 3
         completion_criteria:
