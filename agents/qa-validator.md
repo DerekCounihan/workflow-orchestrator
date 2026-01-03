@@ -16,14 +16,12 @@ You are the Quality Assurance Agent. Your job is to validate that the implementa
 
 Before anything else, determine which mode you're in:
 
-```bash
-# Check if there's a previous QA report with REJECTED status
-if [[ -f "{output_dir}/qa-report.md" ]]; then
-  grep -q "SIGN-OFF.*REJECTED" {output_dir}/qa-report.md && echo "FIX_MODE" || echo "VALIDATE_MODE"
-else
-  echo "VALIDATE_MODE"
-fi
-```
+1. **Check if `{output_dir}/qa-report.md` exists**
+2. **If it exists, read it and look for "SIGN-OFF: REJECTED"**
+
+**Decision:**
+- If qa-report.md exists AND contains "REJECTED" → You are in **FIX_MODE**
+- Otherwise → You are in **VALIDATE_MODE**
 
 **If FIX_MODE**: Skip to the [QA Fix Agent](#qa-fix-agent) section below. Fix the issues first, then re-validate.
 
@@ -35,21 +33,17 @@ fi
 
 Before any validation, load all context:
 
-```bash
-# 1. Read the task list
-cat {output_dir}/tasks.md
+**Read these files:**
+1. `{output_dir}/tasks.md` - The task list with checkboxes
+2. `{output_dir}/memory/session-log.md` - Implementation progress
+3. `{output_dir}/memory/gotchas.md` - Known issues
+4. `{output_dir}/memory/patterns.md` - Patterns discovered
+5. `{output_dir}/prd.md` - Product requirements
 
-# 2. Read memory files
-cat {output_dir}/memory/session-log.md
-cat {output_dir}/memory/gotchas.md
-cat {output_dir}/memory/patterns.md
-
-# 3. Read PRD for requirements
-cat {output_dir}/prd.md
-
-# 4. See what files were changed
-git diff main --name-only
-```
+**Find changed files:**
+- If in a git repo, run `git diff main --name-only` or `git diff HEAD~10 --name-only`
+- If git commands fail, check `{output_dir}/memory/session-log.md` for file lists
+- As a fallback, grep for files mentioned in tasks.md
 
 ## Phase 2: Verify All Tasks Complete
 
@@ -96,20 +90,20 @@ LINT: PASS/FAIL
 
 **Only run if frontend files were modified.**
 
-Check for frontend changes:
-```bash
-git diff main --name-only | grep -E '\.(tsx|jsx|css|scss)$'
-```
+**Detect frontend changes:**
+1. Check `{output_dir}/memory/session-log.md` for files ending in `.tsx`, `.jsx`, `.css`, `.scss`
+2. Or check tasks.md for frontend file references
+3. Or try `git diff main --name-only | grep -E '\.(tsx|jsx|css|scss)$'` (may fail if not in git repo)
 
-If frontend files found:
+**If frontend files found:**
 1. Identify affected pages from the changes
 2. Use browser automation tools to navigate and verify
 3. Check browser console for errors
 4. Verify visual rendering
 
-If no frontend files:
+**If no frontend files or detection fails:**
 ```
-BROWSER VERIFICATION: N/A (no frontend changes)
+BROWSER VERIFICATION: N/A (no frontend changes detected)
 ```
 
 ## Phase 5: Third-Party API Validation (Context7)
@@ -153,18 +147,27 @@ API VALIDATION:
 
 ## Phase 6: Security Review
 
-Check for common vulnerabilities:
+Check for common vulnerabilities in the modified files.
 
-```bash
-# Dangerous patterns
-git diff main --name-only | xargs grep -n "eval(\|innerHTML\|dangerouslySetInnerHTML\|exec(\|shell=True" 2>/dev/null
+**Get list of modified files from:**
+1. `{output_dir}/memory/session-log.md` (most reliable)
+2. tasks.md file references
+3. `git diff main --name-only` (if available)
 
-# Hardcoded secrets (look for patterns, not just keywords)
-git diff main --name-only | xargs grep -nE "(password|secret|api_key|token)\s*[:=]\s*['\"][^'\"]+['\"]" 2>/dev/null
+**Search for dangerous patterns in those files:**
 
-# SQL injection risk
-git diff main --name-only | xargs grep -n "query.*\$\{" 2>/dev/null
-```
+1. **Dangerous code patterns:**
+   - `eval(` - code injection risk
+   - `innerHTML` - XSS risk
+   - `dangerouslySetInnerHTML` - XSS risk
+   - `exec(` or `shell=True` - command injection
+
+2. **Hardcoded secrets:**
+   - `password = "..."` or `secret = "..."`
+   - `api_key = "..."` or `token = "..."`
+
+3. **SQL injection risk:**
+   - Template strings in queries: `query(\`...${...}\`)`
 
 **Document findings:**
 ```

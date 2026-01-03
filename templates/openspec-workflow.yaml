@@ -612,7 +612,7 @@ phases:
           type: "glob_match"
           pattern: "{output_dir}/specs/*/spec.md"
 
-      - id: "1.5"
+      - id: "1.6"
         name: "Validate Spec Structure"
         type: "command"
         prompt: |
