@@ -3,24 +3,8 @@
   "version": "1.0.0",
   "description": "Configurable workflow orchestration with multi-phase support, parallel agents, per-step looping, and human intervention checkpoints. Replicates the OpenSpec workflow pattern as a standalone, marketplace-distributable plugin.",
   "author": {
-    "name": "Nudj Digital",
-    "email": "dev@nudj.com"
+    "name": "Derek Counihan",
+    "email": "derek@wenudj.com"
   },
-  "keywords": [
-    "workflow",
-    "orchestration",
-    "agents",
-    "automation",
-    "openspec",
-    "pipeline"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/derekcounihan/workflow-orchestrator.git"
-  },
-  "license": "MIT",
-  "components": {
-    "commands": ["commands/"],
-    "hooks": ["hooks/"]
-  }
+  "repository": "https://github.com/derekcounihan/workflow-orchestrator"
 }
