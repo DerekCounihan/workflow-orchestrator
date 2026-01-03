@@ -873,19 +873,39 @@ phases:
         prompt: |
           Execute tasks from {output_dir}/tasks.md sequentially.
 
-          For each task:
-          1. Read the task description
-          2. Implement the change
-          3. Mark task as [x] when complete
-          4. If task matches review triggers, run targeted agents
-          5. Fix any CRITICAL/ERROR issues before proceeding
+          ## Task List Format
 
-          After completing all tasks, complete ## 99. Validation section.
+          The task file uses checkbox format for progress tracking:
+          - `- [ ]` = pending task
+          - `- [x]` = completed task
+
+          The header shows: `**Completed**: X/Y subtasks`
+
+          ## Finding Your Next Task
+
+          1. Look at the **Completed** counter in the header
+          2. Find the first unchecked `- [ ]` task
+          3. That's your next task
+
+          ## For Each Task
+
+          1. Read the task description (files, patterns, verification)
+          2. Implement the change following patterns from reference files
+          3. Run the verification command
+          4. If verification passes:
+             - Change `- [ ]` to `- [x]`
+             - Update the **Completed** counter
+          5. If task matches review triggers, run targeted agents
+          6. Fix any CRITICAL/ERROR issues before proceeding
+
+          ## After All Tasks
+
+          Complete the ## 99. Validation section checkboxes.
 
           NOTE: Gate checks (typecheck + lint) will run automatically after this step.
           Fix any issues before the workflow advances to the next phase.
 
-          When ALL tasks complete and validation passes:
+          When ALL tasks and validation checkboxes are marked [x]:
           <promise>STEP_COMPLETE</promise>
         max_iterations: 100
 

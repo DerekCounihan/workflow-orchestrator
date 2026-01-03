@@ -68,6 +68,65 @@ get_state_variables() {
   echo "$vars"
 }
 
+# Parse task progress from tasks.md checkbox format
+# Returns: "X/Y completed | Next: Z.Z - Description"
+get_task_progress() {
+  local state_file="$1"
+  local output_dir
+  output_dir=$(parse_state_field "$state_file" "output_dir")
+
+  local tasks_file="${output_dir}/tasks.md"
+
+  if [[ ! -f "$tasks_file" ]]; then
+    echo ""
+    return
+  fi
+
+  # Count completed and total tasks (excluding validation section tasks)
+  local completed=0
+  local total=0
+  local next_task=""
+  local in_validation=false
+
+  while IFS= read -r line; do
+    # Check if we're in validation section
+    if [[ "$line" =~ ^##.*99.*Validation ]]; then
+      in_validation=true
+    fi
+
+    # Skip validation section tasks for progress count
+    if [[ "$in_validation" == "true" ]]; then
+      continue
+    fi
+
+    # Match checkbox lines: - [x] or - [ ]
+    if [[ "$line" =~ ^[[:space:]]*-[[:space:]]\[x\][[:space:]]\*\*([0-9]+\.[0-9]+)\*\* ]]; then
+      ((completed++))
+      ((total++))
+    elif [[ "$line" =~ ^[[:space:]]*-[[:space:]]\[[[:space:]]\][[:space:]]\*\*([0-9]+\.[0-9]+)\*\*[[:space:]]+(.*) ]]; then
+      ((total++))
+      # Capture first pending task
+      if [[ -z "$next_task" ]]; then
+        local task_id="${BASH_REMATCH[1]}"
+        local task_desc="${BASH_REMATCH[2]}"
+        next_task="${task_id} - ${task_desc}"
+      fi
+    fi
+  done < "$tasks_file"
+
+  if [[ $total -eq 0 ]]; then
+    echo ""
+    return
+  fi
+
+  local progress="${completed}/${total} subtasks"
+  if [[ -n "$next_task" ]]; then
+    echo "${progress} | Next: ${next_task}"
+  else
+    echo "${progress} | All subtasks complete"
+  fi
+}
+
 # ============================================================================
 # MAIN LOGIC
 # ============================================================================
@@ -296,9 +355,17 @@ Once all gate checks pass, the workflow will advance to the next step."
   # Print workflow status banner
   print_workflow_status "$WORKFLOW_NAME" "$DISPLAY_PHASE" "$NEXT_STEP" "$NEXT_STEP_NAME" "1" "$STEP_MAX" "$TOTAL_ITERATIONS"
 
+  # Build system message with task progress
+  TASK_PROGRESS=$(get_task_progress "$ACTIVE_STATE_FILE")
+  if [[ -n "$TASK_PROGRESS" ]]; then
+    NEXT_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX) | Tasks: $TASK_PROGRESS"
+  else
+    NEXT_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX)"
+  fi
+
   jq -n \
     --arg prompt "$NEXT_PROMPT" \
-    --arg msg "Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX)" \
+    --arg msg "$NEXT_SYSTEM_MSG" \
     '{
       "decision": "block",
       "reason": $prompt,
@@ -368,9 +435,17 @@ if [[ $CURRENT_ITERATION -ge $STEP_MAX_ITERATIONS ]]; then
     DISPLAY_PHASE=$(parse_state_field "$ACTIVE_STATE_FILE" "current_phase")
     print_workflow_status "$WORKFLOW_NAME" "$DISPLAY_PHASE" "$NEXT_STEP" "$NEXT_STEP_NAME" "1" "$STEP_MAX" "$TOTAL_ITERATIONS"
 
+    # Build system message with task progress
+    TASK_PROGRESS=$(get_task_progress "$ACTIVE_STATE_FILE")
+    if [[ -n "$TASK_PROGRESS" ]]; then
+      FORCE_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX) [Force advanced] | Tasks: $TASK_PROGRESS"
+    else
+      FORCE_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX) [Force advanced from $CURRENT_STEP]"
+    fi
+
     jq -n \
       --arg prompt "$NEXT_PROMPT" \
-      --arg msg "Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX) [Force advanced from $CURRENT_STEP]" \
+      --arg msg "$FORCE_SYSTEM_MSG" \
       '{
         "decision": "block",
         "reason": $prompt,
@@ -397,9 +472,14 @@ VARS=$(get_state_variables "$ACTIVE_STATE_FILE")
 # shellcheck disable=SC2086
 STEP_PROMPT=$(substitute_vars "$STEP_PROMPT" $VARS)
 
-# Build system message
+# Build system message with task progress
 STEP_NAME=$(get_step_field "$WORKFLOW_CONFIG" "$CURRENT_STEP" "name")
-SYSTEM_MSG="Step: $CURRENT_STEP - $STEP_NAME (iteration $NEXT_ITERATION/$STEP_MAX_ITERATIONS)"
+TASK_PROGRESS=$(get_task_progress "$ACTIVE_STATE_FILE")
+if [[ -n "$TASK_PROGRESS" ]]; then
+  SYSTEM_MSG="Step: $CURRENT_STEP - $STEP_NAME (iteration $NEXT_ITERATION/$STEP_MAX_ITERATIONS) | Tasks: $TASK_PROGRESS"
+else
+  SYSTEM_MSG="Step: $CURRENT_STEP - $STEP_NAME (iteration $NEXT_ITERATION/$STEP_MAX_ITERATIONS)"
+fi
 
 # Print iteration status
 print_iteration "$CURRENT_STEP" "$NEXT_ITERATION" "$STEP_MAX_ITERATIONS" "$NEW_TOTAL"

@@ -206,40 +206,58 @@ Include parallelism analysis in your output:
 
 Create `{output_dir}/implementation-plan.json` with the complete plan structure.
 
-Also create a human-readable summary in `{output_dir}/tasks.md`:
+Also create a human-readable task list in `{output_dir}/tasks.md`:
 
 ```markdown
 # Implementation Tasks: {Feature Name}
 
+**Status**: Pending
+**Completed**: 0/{N} subtasks
 **Workflow Type**: {type}
 **Risk Level**: {level}
-**Estimated Phases**: {N}
-**Parallelism**: Up to {N} phases can run in parallel
+
+---
 
 ## Phase 1: {Name}
 Dependencies: None
 
-### Subtask 1.1: {Description}
-- **Service**: backend
-- **Files**: `src/models/analytics.ts` (create)
-- **Pattern from**: `src/models/existing.ts`
-- **Verification**: `pnpm typecheck` → No errors
+- [ ] **1.1** {Description}
+  - Service: backend
+  - Files: `src/models/analytics.ts` (create)
+  - Pattern from: `src/models/existing.ts`
+  - Verify: `pnpm typecheck` → No errors
 
-### Subtask 1.2: {Description}
-...
+- [ ] **1.2** {Description}
+  - Service: backend
+  - Files: `src/routes/analytics.ts` (modify)
+  - Pattern from: `src/routes/users.ts`
+  - Verify: `curl localhost:3000/api/analytics`
 
 ## Phase 2: {Name}
 Dependencies: Phase 1
 
-...
+- [ ] **2.1** {Description}
+  - Service: frontend
+  - Files: `src/components/Analytics.tsx` (create)
+  - Pattern from: `src/components/Dashboard.tsx`
+  - Verify: Visual check at `/analytics`
 
-## Verification Strategy
+---
 
-| Step | Command | Required | Blocking |
-|------|---------|----------|----------|
-| Type Check | pnpm typecheck | Yes | Yes |
-| Unit Tests | pnpm test | Yes | Yes |
+## 99. Validation
+
+Run after all subtasks are complete:
+
+- [ ] `pnpm typecheck` passes
+- [ ] `pnpm lint` passes
+- [ ] `pnpm test` passes (if applicable)
+- [ ] Manual verification of key flows
 ```
+
+**IMPORTANT**: The checkbox format (`- [ ]` / `- [x]`) is required because:
+1. The stop hook parses progress from checkbox state
+2. Claude can see what's done when the prompt is re-injected
+3. Users can see progress at a glance
 
 ## Rules
 

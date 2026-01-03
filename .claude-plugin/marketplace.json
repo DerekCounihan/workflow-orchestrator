@@ -1,6 +1,6 @@
 {
   "name": "workflow-orchestrator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Workflow orchestration plugins for Claude Code",
   "owner": {
     "name": "Derek Counihan",
@@ -10,7 +10,7 @@
     {
       "name": "workflow-orchestrator",
       "description": "Configurable workflow orchestration with multi-phase support, parallel agents, per-step looping, and human intervention checkpoints",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "source": "./",
       "category": "productivity"
     }
