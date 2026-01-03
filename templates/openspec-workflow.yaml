@@ -66,13 +66,11 @@ phases:
         type: "agents"
         parallel: true
         agents:
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/product-domain-specialist.md"
+          - subagent_type: "product-domain-specialist"
             prompt: |
               Analyze product requirements for: {feature_description}
 
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/product-edge-case-analyst.md"
+          - subagent_type: "product-edge-case-analyst"
             prompt: |
               Identify edge cases for: {feature_description}
 
@@ -244,18 +242,15 @@ phases:
         type: "agents"
         parallel: true
         agents:
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/codebase-pattern-analyzer.md"
+          - subagent_type: "codebase-pattern-analyzer"
             prompt: |
               Analyze codebase patterns for: {feature_description}
 
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/architecture-reviewer.md"
+          - subagent_type: "architecture-reviewer"
             prompt: |
               Review architecture for: {feature_description}
 
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/backend-integration-analyst.md"
+          - subagent_type: "backend-integration-analyst"
             prompt: |
               Analyze backend integrations for: {feature_description}
 
@@ -561,20 +556,15 @@ phases:
         agent_count: 5
         agent_selection: "dynamic"
         agent_pool:
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/accuracy-validator.md"
+          - subagent_type: "accuracy-validator"
             focus: "api-database"
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/accuracy-validator.md"
+          - subagent_type: "accuracy-validator"
             focus: "events-webhooks"
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/accuracy-validator.md"
+          - subagent_type: "accuracy-validator"
             focus: "caching"
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/accuracy-validator.md"
+          - subagent_type: "accuracy-validator"
             focus: "testing"
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/accuracy-validator.md"
+          - subagent_type: "accuracy-validator"
             focus: "ui-frontend"
         prompt_template: |
           Validate accuracy for {focus} aspects of the spec.
@@ -644,14 +634,11 @@ phases:
         parallel: true
         agent_count: 3
         agent_pool:
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/tech-steer-validator.md"
+          - subagent_type: "tech-steer-validator"
             focus: "architecture"
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/tech-steer-validator.md"
+          - subagent_type: "tech-steer-validator"
             focus: "schema-data"
-          - subagent_type: "general-purpose"
-            prompt_file: "agents/tech-steer-validator.md"
+          - subagent_type: "tech-steer-validator"
             focus: "integration"
         prompt_template: |
           Validate tech steer compliance for {focus}.

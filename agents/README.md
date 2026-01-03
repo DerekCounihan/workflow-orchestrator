@@ -1,6 +1,6 @@
 # Agent Prompts
 
-This directory contains generic agent prompts that the workflow orchestrator injects into `general-purpose` agents.
+This directory contains custom agent definitions that are registered when the plugin is installed. Each agent has a specific role in the workflow orchestration process.
 
 ## How It Works
 
@@ -8,16 +8,15 @@ When the workflow YAML references an agent like:
 
 ```yaml
 agents:
-  - subagent_type: "general-purpose"
-    prompt_file: "agents/product-domain-specialist.md"
+  - subagent_type: "product-domain-specialist"
     prompt: |
       Analyze requirements for: {feature_description}
 ```
 
-The orchestrator:
-1. Reads the prompt file from this directory
-2. Prepends it to the step's prompt
-3. Launches a `general-purpose` agent with the combined prompt
+Claude Code:
+1. Finds the agent definition in `agents/product-domain-specialist.md`
+2. Uses the frontmatter to configure tools and model
+3. Combines the agent's base prompt with the step's specific prompt
 
 ## Available Agents
 
@@ -31,13 +30,26 @@ The orchestrator:
 | `accuracy-validator.md` | Validates spec claims against actual codebase |
 | `tech-steer-validator.md` | Ensures specs align with developer guidance |
 
+## Agent Frontmatter
+
+Each agent file includes YAML frontmatter that configures the agent:
+
+```yaml
+---
+name: agent-name
+description: What this agent does (shown in /agents list)
+tools: ["Read", "Grep", "Glob", "WebSearch"]  # Available tools
+model: inherit  # Optional: sonnet, opus, haiku, or inherit
+---
+```
+
 ## Customizing Agents
 
 To customize agents for your project:
 
 1. Copy the agent file to your project's `.claude/agents/` directory
 2. Modify as needed
-3. The workflow will use your local version if it exists
+3. Your local version takes precedence over the plugin version
 
 The lookup order is:
 1. `.claude/agents/{agent-name}.md` (project-specific)
