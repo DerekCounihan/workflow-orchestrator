@@ -7,6 +7,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# Source terminal UI helpers
+source "${PLUGIN_ROOT}/scripts/terminal-ui.sh"
+
 # Default values
 WORKFLOW_NAME=""
 CONFIG_PATH=""
@@ -218,15 +221,17 @@ When current step completes: \`<promise>STEP_COMPLETE</promise>\`
 When workflow completes: \`<promise>WORKFLOW_COMPLETE</promise>\`
 EOF
 
-echo "Workflow initialized successfully!"
-echo ""
-echo "  Name: ${WORKFLOW_NAME}"
-echo "  Config: ${CONFIG_PATH}"
-echo "  State: ${STATE_FILE}"
-echo "  Change ID: ${CHANGE_ID}"
-echo "  Output: ${OUTPUT_DIR}"
-echo ""
-echo "  Phase: ${FIRST_PHASE}"
-echo "  Step: ${FIRST_STEP}"
-echo ""
-echo "The workflow is now active. The stop hook will manage iteration."
+# Display initialization banner
+print_header "WORKFLOW INITIALIZED"
+print_success "Workflow initialized successfully!"
+ui_print ""
+ui_print "  ${WHITE}Name:${NC}      ${YELLOW}${WORKFLOW_NAME}${NC}"
+ui_print "  ${WHITE}Config:${NC}    ${GRAY}${CONFIG_PATH}${NC}"
+ui_print "  ${WHITE}State:${NC}     ${GRAY}${STATE_FILE}${NC}"
+ui_print "  ${WHITE}Change ID:${NC} ${CYAN}${CHANGE_ID}${NC}"
+ui_print "  ${WHITE}Output:${NC}    ${GRAY}${OUTPUT_DIR}${NC}"
+ui_print ""
+ui_print "  ${WHITE}Phase:${NC}     ${BLUE}${FIRST_PHASE}${NC}"
+ui_print "  ${WHITE}Step:${NC}      ${GREEN}${FIRST_STEP}${NC}"
+ui_print ""
+print_info "The workflow is now active. The stop hook will manage iteration."

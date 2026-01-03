@@ -98,7 +98,7 @@ fi
 # Check global iteration limit
 if [[ "$MAX_GLOBAL_ITERATIONS" =~ ^[0-9]+$ ]] && [[ $MAX_GLOBAL_ITERATIONS -gt 0 ]]; then
   if [[ $TOTAL_ITERATIONS -ge $MAX_GLOBAL_ITERATIONS ]]; then
-    echo "Max global iterations ($MAX_GLOBAL_ITERATIONS) reached."
+    print_warning "Max global iterations ($MAX_GLOBAL_ITERATIONS) reached."
     update_state_field "$ACTIVE_STATE_FILE" "status" "completed"
     exit 0
   fi
