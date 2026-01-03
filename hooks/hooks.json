@@ -1,0 +1,15 @@
+{
+  "description": "Workflow Orchestrator stop hook for per-step looping with phase advancement",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/stop-hook.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

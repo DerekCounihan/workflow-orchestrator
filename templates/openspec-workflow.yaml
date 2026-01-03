@@ -1,0 +1,929 @@
+# OpenSpec Workflow Template
+# Version: 1.0.0
+#
+# This workflow replicates the OpenSpec proposal process:
+# - Phase 0a: Product Requirements Discovery
+# - Phase 0b: Technical Research
+# - Phase 1: Scaffolding & Specification
+# - Phase 1.5: Accuracy Validation
+# - Phase 1.6: Tech Steer Validation
+# - Phase 1.7: Final Spec Validation
+# - Approval: User approval checkpoint
+# - Phase 2: Implementation
+# - Phase 3: Archive
+
+metadata:
+  name: "openspec-proposal"
+  version: "1.0.0"
+  description: "OpenSpec proposal workflow with product discovery, technical research, and multi-phase validation"
+
+settings:
+  max_global_iterations: 200
+  default_max_step_iterations: 10
+  state_file: ".claude/workflows/openspec-{change_id}.state.md"
+  output_dir: "openspec/changes/{change_id}"
+  # Gate checks run after step completion before advancing
+  # Options: "none", "typecheck", "lint", "typecheck-lint", "full-suite"
+  # Implementation steps (Phase 2) use "typecheck-lint" by default
+  default_gate_checks: "none"
+
+variables:
+  # These are set at workflow start
+  feature_description: ""
+  change_id: ""
+  question_count: 10
+
+# =============================================================================
+# PHASE 0a: Product Requirements Discovery
+# =============================================================================
+phases:
+  - id: "0a"
+    name: "Product Requirements Discovery"
+    description: "Understand product requirements before technical research"
+
+    steps:
+      - id: "0a.1"
+        name: "Create Folder Structure"
+        type: "command"
+        prompt: |
+          Create the OpenSpec change folder structure.
+
+          Derive a change-id from the feature description: "{feature_description}"
+          Use kebab-case, verb-led naming (e.g., "add-shop-purchase", "fix-auth-flow")
+
+          Create directories:
+          - {output_dir}/
+          - {output_dir}/specs/
+
+          Output the change-id you chose.
+        max_iterations: 2
+        completion_criteria:
+          type: "output_contains"
+          pattern: "change-id:"
+
+      - id: "0a.2"
+        name: "Launch Product Specialists"
+        type: "agents"
+        parallel: true
+        agents:
+          - subagent_type: "product-domain-specialist"
+            prompt: |
+              Analyze product requirements for: {feature_description}
+
+              Your role:
+              1. Map user requirements to platform concepts
+              2. Research competitor patterns via WebSearch
+              3. Clarify terminology (what user terms mean in platform context)
+
+              Focus on USER EXPERIENCE only - NO technical suggestions.
+
+              Return structured output:
+              ## Platform Mapping
+              | User Concept | Platform Entity | Notes |
+
+              ## Industry Insights
+              - Competitor patterns
+
+              ## Open Questions
+              - Product scope questions
+
+          - subagent_type: "product-edge-case-analyst"
+            prompt: |
+              Identify edge cases for: {feature_description}
+
+              Your role:
+              1. Define the happy path (what user does → what user sees)
+              2. Identify edge cases by category
+              3. Research how competitors handle failures
+              4. Create priority matrix (P0/P1/P2)
+
+              Focus on USER EXPERIENCE only - NO technical solutions.
+
+              Return structured output:
+              ## Happy Path
+              | Step | User Action | User Experience |
+
+              ## Edge Cases
+              | Priority | Scenario | Trigger | User Experience |
+
+              ## Industry Patterns
+              - How competitors handle similar edge cases
+
+        max_iterations: 3
+        completion_criteria:
+          type: "agent_responses"
+          min_agents: 2
+
+      - id: "0a.3"
+        name: "Create PRD"
+        type: "consolidate"
+        source_steps: ["0a.2"]
+        prompt: |
+          Create a Product Requirements Document (PRD) at {output_dir}/prd.md
+
+          Consolidate the outputs from the product specialists into:
+
+          # Product Requirements Document: [Feature Name]
+
+          **Status**: Draft
+          **Created**: [date]
+
+          > **Note**: This document describes USER EXPERIENCE only.
+
+          ## 1. Overview
+          [1-2 sentences from user perspective]
+
+          ## 2. Platform Context
+          - Primary Concept: [main platform entity]
+          - Related Concepts: [other entities]
+          - User Journey Stage: [Join → Challenge → Earn → Redeem]
+
+          ## 3. User Scenarios
+          [Table from happy path analysis]
+
+          ## 4. Edge Cases & User Experience
+          [Table from edge case analysis]
+
+          ## 5. Industry Insights (3-5 bullets)
+          [From competitor research]
+
+          ## 6. Out of Scope
+          [What we are NOT building]
+
+          ## 7. Open Questions
+          [Product questions that need answers]
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 3
+        completion_criteria:
+          type: "file_exists"
+          path: "{output_dir}/prd.md"
+
+      - id: "0a.4"
+        name: "Present PRD for Initial Review"
+        type: "checkpoint"
+        gate: "questions"
+        prompt: |
+          ## Product Requirements Document - Initial Draft
+
+          I've created a PRD at `{output_dir}/prd.md`
+
+          **Summary**: {prd_summary}
+          **Scenarios**: {scenario_count} scenarios, {edge_case_count} edge cases
+          **Open Questions**: {open_questions}
+
+          Please review and:
+          1. Answer the open questions
+          2. Flag any missing scenarios or edge cases
+          3. Provide any tech steer that might affect PRODUCT scope
+        required_response: true
+        collect_answers: true
+        timeout_action: "pause"
+
+      - id: "0a.5"
+        name: "Collect Tech Steer"
+        type: "checkpoint"
+        gate: "questions"
+        prompt: |
+          Before I finalize the PRD, do you have any tech steer that affects PRODUCT scope?
+
+          Examples of scope-changing tech steer:
+          - "We already have X feature, just extend it" → Reduces PRD scope
+          - "We need to support Y as well" → Adds to PRD scope
+          - "That edge case is handled globally" → Remove from PRD
+
+          (Or say "no changes needed" to continue)
+        optional: true
+        default_response: "no changes needed"
+
+      - id: "0a.6"
+        name: "Update PRD Based on Tech Steer"
+        type: "conditional"
+        condition: "checkpoint_0a.5_response != 'no changes needed'"
+        then_steps:
+          - id: "0a.6.1"
+            name: "Apply Tech Steer to PRD"
+            type: "command"
+            prompt: |
+              Update the PRD at {output_dir}/prd.md based on tech steer:
+
+              Tech Steer: {checkpoint_0a.5_response}
+
+              Make changes to:
+              - Add/remove scenarios
+              - Adjust scope
+              - Update edge cases
+              - Add "Out of Scope" items
+
+              Keep PRD non-technical (describe USER EXPERIENCE only).
+
+              After updating, output: <promise>STEP_COMPLETE</promise>
+        else_step: "0a.7"
+
+      - id: "0a.7"
+        name: "Get Final PRD Approval"
+        type: "checkpoint"
+        gate: "approval"
+        stop_gate: true
+        prompt: |
+          ## Final PRD Ready for Approval
+
+          The PRD at `{output_dir}/prd.md` has been updated.
+
+          **Status**: Ready for final approval
+
+          Please respond:
+          - "PRD approved" / "Approved" / "LGTM" → Continue to technical research
+          - "Changes needed: [describe]" → I'll update the PRD
+        required_keywords: ["approved", "lgtm", "proceed", "continue"]
+        on_rejected: "goto:0a.4"
+
+# =============================================================================
+# PHASE 0b: Technical Research
+# =============================================================================
+  - id: "0b"
+    name: "Technical Research"
+    description: "Ground technical research in actual codebase findings"
+    depends_on: ["0a"]
+
+    steps:
+      - id: "0b.1"
+        name: "Library Research"
+        type: "agents"
+        agents:
+          - subagent_type: "general-purpose"
+            tools: ["mcp__context7__resolve-library-id", "mcp__context7__query-docs"]
+            prompt: |
+              Research relevant libraries for implementing: {feature_description}
+
+              Use Context7 to:
+              1. Resolve library IDs for relevant packages
+              2. Query documentation for patterns, APIs, edge cases
+
+              Focus on libraries already used in the codebase.
+
+              Return:
+              ## Libraries Researched
+              | Library | Relevant Patterns | Key APIs |
+
+              ## Documentation Findings
+              - [Key findings from docs]
+        max_iterations: 5
+        completion_criteria:
+          type: "has_output"
+
+      - id: "0b.2"
+        name: "Launch Technical Agents"
+        type: "agents"
+        parallel: true
+        agents:
+          - subagent_type: "codebase-pattern-analyzer"
+            prompt: |
+              Analyze codebase patterns for: {feature_description}
+
+              Use Glob/Grep to find:
+              1. Similar feature implementations
+              2. File organization patterns
+              3. Service layer patterns
+              4. Data flow patterns
+
+              Return:
+              ## Files Identified
+              - [actual file path]: [what it does, why relevant]
+
+              ## Existing Patterns
+              - [Pattern name]: Used in [file:line] - [description]
+
+              ## Similar Features
+              - [Feature]: Implemented in [files] - [how it's done]
+
+          - subagent_type: "architecture-reviewer"
+            prompt: |
+              Review architecture for: {feature_description}
+
+              Validate:
+              1. File placement (per review-context.md)
+              2. Service layer patterns
+              3. Schema locations
+              4. Module boundaries
+
+              Return:
+              ## Recommended File Locations
+              | Component | Path | Rationale |
+
+              ## Service Layer Pattern
+              - tRPC endpoint → service → store service
+
+              ## Potential Concerns
+              - [Architecture issues to address]
+
+          - subagent_type: "backend-integration-analyst"
+            prompt: |
+              Analyze backend integrations for: {feature_description}
+
+              Research:
+              1. Data operations (CRUD, queries)
+              2. Caching strategies (CacheTag.*)
+              3. Event patterns (what events to emit)
+              4. Webhook integrations
+
+              Return:
+              ## Data Operations
+              - [Operation]: [Collection/Service]
+
+              ## Caching
+              - [Cache tag]: [Purpose]
+
+              ## Events
+              - [Event name]: [When to emit]
+
+              ## Webhooks
+              - [Webhook]: [Trigger condition]
+
+        max_iterations: 3
+        completion_criteria:
+          type: "agent_responses"
+          min_agents: 3
+
+      - id: "0b.3"
+        name: "Document Research Findings"
+        type: "consolidate"
+        source_steps: ["0b.1", "0b.2"]
+        prompt: |
+          Create research findings document at {output_dir}/research-findings.md
+
+          Consolidate all technical research into:
+
+          # Research Findings: {feature_description}
+
+          ## Libraries
+          [From 0b.1]
+
+          ## Files Identified
+          [From codebase-pattern-analyzer]
+
+          ## Existing Patterns
+          [From codebase-pattern-analyzer]
+
+          ## Architecture Recommendations
+          [From architecture-reviewer]
+
+          ## Backend Integrations
+          [From backend-integration-analyst]
+
+          ## Potential Conflicts/Concerns
+          [Any issues identified]
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 2
+        completion_criteria:
+          type: "file_exists"
+          path: "{output_dir}/research-findings.md"
+
+      - id: "0b.4"
+        name: "Generate Grounded Questions"
+        type: "command"
+        prompt: |
+          Generate {question_count} grounded clarifying questions based on research.
+
+          CRITICAL: Every question MUST reference actual findings from {output_dir}/research-findings.md
+
+          Organize by Frontend vs Backend:
+
+          ## PRIORITY QUESTIONS
+          1. Will this require a NEW MongoDB collection?
+          2. What's the PRIMARY consumer? (real-time / admin / analytics)
+          3. Schema design preference? (nested / flat)
+
+          ## FRONTEND QUESTIONS
+          4. I found [component] handles similar UI. Extend or create new?
+          5. Pattern in [file:line] uses [approach]. Follow?
+          ...
+
+          ## BACKEND QUESTIONS
+          8. I found [router] handles similar features. Extend or new?
+          9. [Service] exists. Add here or separate?
+          ...
+
+          ## ASSUMPTIONS TO VALIDATE
+          12. I'm assuming [X]. Correct?
+          ...
+
+          After generating questions, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 3
+        completion_criteria:
+          type: "output_contains"
+          pattern: "^\\d+\\."
+          min_count: "{question_count}"
+
+      - id: "0b.5"
+        name: "Present Questions"
+        type: "checkpoint"
+        gate: "questions"
+        stop_gate: true
+        prompt: |
+          ## Technical Research Complete - Clarifying Questions
+
+          I've analyzed the codebase and have {question_count} questions before I can write the spec.
+
+          **Key Findings**:
+          - [Summary of research]
+
+          **Questions**:
+          {generated_questions}
+
+          Please answer ALL questions before I proceed. I cannot write accurate specs without your input.
+        required_response: true
+        collect_answers: true
+        min_answers: "{question_count}"
+
+      - id: "0b.6"
+        name: "Document Answers"
+        type: "command"
+        prompt: |
+          Create technical decisions document at {output_dir}/technical-decisions.md
+
+          # Technical Decisions: {feature_description}
+
+          **Date**: [today]
+          **Answered by**: Developer
+
+          ## Questions & Answers
+
+          | # | Question | Answer |
+          |---|----------|--------|
+          {question_answer_table}
+
+          ## Key Decisions Summary
+          - **Architecture**: [summary]
+          - **Data**: [summary]
+          - **Integration**: [summary]
+          - **Edge Cases**: [summary]
+
+          ---
+          _These decisions inform proposal.md and specs. Do not deviate without re-confirming._
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 2
+        completion_criteria:
+          type: "file_exists"
+          path: "{output_dir}/technical-decisions.md"
+
+# =============================================================================
+# PHASE 1: Scaffolding & Specification
+# =============================================================================
+  - id: "1"
+    name: "Scaffolding & Specification"
+    description: "Create proposal, tasks, and spec deltas"
+    depends_on: ["0b"]
+
+    steps:
+      - id: "1.1"
+        name: "Review OpenSpec Context"
+        type: "command"
+        prompt: |
+          Review existing OpenSpec context:
+
+          1. Read openspec/project.md for project conventions
+          2. Run: openspec list (show active changes)
+          3. Run: openspec list --specs (show specifications)
+          4. Search for related specs: rg "Requirement:|Scenario:" openspec/specs
+
+          Understand current state before scaffolding.
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 2
+
+      - id: "1.2"
+        name: "Create Proposal"
+        type: "command"
+        prompt: |
+          Create proposal.md at {output_dir}/proposal.md
+
+          Include:
+          # Change: {feature_title}
+
+          ## Why
+          [From PRD - business value]
+
+          ## What Changes
+          [High-level changes]
+
+          ## Impact
+          - Affected specs: [list]
+          - Affected code: [list files]
+
+          ## Research Findings
+          [Include from {output_dir}/research-findings.md]
+
+          ### Libraries (Context7)
+          [Library findings]
+
+          ### Codebase Patterns
+          | File | Pattern |
+
+          ### Edge Cases
+          [How to handle each]
+
+          ### Technical Decisions
+          | Question | Decision |
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 3
+        completion_criteria:
+          type: "file_exists"
+          path: "{output_dir}/proposal.md"
+
+      - id: "1.3"
+        name: "Create Tasks"
+        type: "command"
+        prompt: |
+          Create tasks.md at {output_dir}/tasks.md using TDD approach.
+
+          Structure with tests interleaved after implementation sections:
+
+          ## 0. Infrastructure (if needed)
+          - [ ] 0.1 [Setup task]
+
+          ## 1. Models & DTOs
+          - [ ] 1.1 Create schema...
+          - [ ] 1.2 Create types...
+
+          ## 2. Model Tests (TDD)
+          - [ ] 2.1 Write schema validation tests
+          - [ ] 2.2 Run tests - verify pass
+
+          ## 3. Store Services
+          - [ ] 3.1 Implement store methods
+          - [ ] 3.2 **Tests**: Write store service unit tests
+          - [ ] 3.3 Run tests - verify pass
+
+          [Continue pattern: implement → test → verify]
+
+          ## 99. Validation (REQUIRED)
+          [Will be filled by validate-spec]
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 3
+        completion_criteria:
+          type: "file_exists"
+          path: "{output_dir}/tasks.md"
+
+      - id: "1.4"
+        name: "Create Spec Deltas"
+        type: "command"
+        prompt: |
+          Create spec deltas at {output_dir}/specs/{capability}/spec.md
+
+          Use format:
+          # Capability: {capability_name}
+
+          ## ADDED Requirements
+
+          ### Requirement: [Name]
+          [Description]
+
+          #### Scenario: [Happy Path]
+          - **GIVEN** [precondition]
+          - **WHEN** [action]
+          - **THEN** [expected result]
+
+          #### Scenario: [Edge Case]
+          - **GIVEN** [precondition]
+          - **WHEN** [action]
+          - **THEN** [expected result]
+
+          ## MODIFIED Requirements
+          [If modifying existing]
+
+          ## REMOVED Requirements
+          [If removing]
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 3
+        completion_criteria:
+          type: "glob_match"
+          pattern: "{output_dir}/specs/*/spec.md"
+
+      - id: "1.5"
+        name: "Validate Spec Structure"
+        type: "command"
+        prompt: |
+          Validate the spec structure:
+
+          Run: openspec validate {change_id} --strict
+
+          If validation fails, fix the issues:
+          - Missing scenarios → Add GIVEN/WHEN/THEN
+          - Malformed headers → Fix formatting
+          - Missing sections → Add required sections
+
+          Repeat until validation passes.
+
+          When validation passes, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 5
+        completion_criteria:
+          type: "command_success"
+          command: "openspec validate {change_id} --strict"
+
+# =============================================================================
+# PHASE 1.5: Accuracy Validation
+# =============================================================================
+  - id: "1.5"
+    name: "Accuracy Validation"
+    description: "Multi-batch validation of claims against codebase"
+    depends_on: ["1"]
+
+    steps:
+      - id: "1.5.1"
+        name: "First Accuracy Batch"
+        type: "agents"
+        parallel: true
+        agent_count: 5
+        agent_selection: "dynamic"
+        agent_pool:
+          - subagent_type: "accuracy-validator"
+            focus: "api-database"
+          - subagent_type: "accuracy-validator"
+            focus: "events-webhooks"
+          - subagent_type: "accuracy-validator"
+            focus: "caching"
+          - subagent_type: "accuracy-validator"
+            focus: "testing"
+          - subagent_type: "accuracy-validator"
+            focus: "ui-frontend"
+        prompt_template: |
+          Validate accuracy for {focus} aspects of the spec.
+
+          Read:
+          - {output_dir}/tasks.md
+          - {output_dir}/specs/*/spec.md
+          - {output_dir}/prd.md
+          - {output_dir}/technical-decisions.md
+
+          For each claim, verify against actual codebase.
+
+          Return MAX 10 inaccuracies:
+          ## Accuracy Report: {focus}
+
+          ### Inaccuracies Found
+          1. **INACCURACY**: [Section X.X]
+             - **Claim**: "[what the spec says]"
+             - **Actual**: [what the codebase shows] at [file:line]
+             - **Fix**: [how to correct]
+        max_findings_per_agent: 10
+        max_iterations: 3
+        completion_criteria:
+          type: "agent_responses"
+          min_agents: 5
+
+      - id: "1.5.2"
+        name: "Apply Accuracy Fixes"
+        type: "consolidate"
+        source_steps: ["1.5.1"]
+        prompt: |
+          Consolidate accuracy reports from all agents.
+
+          For each inaccuracy:
+          1. Verify it's a real issue
+          2. Apply the fix to the appropriate file
+          3. Track what was fixed
+
+          Create report at {output_dir}/accuracy-fixes-1.md
+
+          When all fixes applied, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 5
+
+      - id: "1.5.3"
+        name: "Second Accuracy Batch"
+        type: "agents"
+        parallel: true
+        agent_count: 5
+        reuse_config: "1.5.1"
+        prompt_suffix: "This is a RE-VALIDATION pass. Check that previous fixes are correct."
+        max_iterations: 3
+        completion_criteria:
+          type: "no_issues"
+        on_issues: "goto:1.5.4"
+
+      - id: "1.5.4"
+        name: "Third Accuracy Batch"
+        type: "agents"
+        parallel: true
+        agent_count: 5
+        reuse_config: "1.5.1"
+        optional: true
+        on_issues: "flag_for_review"
+        max_iterations: 2
+
+# =============================================================================
+# PHASE 1.6: Tech Steer Validation
+# =============================================================================
+  - id: "1.6"
+    name: "Tech Steer Validation"
+    description: "Verify developer guidance is being followed"
+    depends_on: ["1.5"]
+
+    steps:
+      - id: "1.6.1"
+        name: "First Tech Steer Batch"
+        type: "agents"
+        parallel: true
+        agent_count: 3
+        agent_pool:
+          - subagent_type: "tech-steer-validator"
+            focus: "architecture"
+          - subagent_type: "tech-steer-validator"
+            focus: "schema-data"
+          - subagent_type: "tech-steer-validator"
+            focus: "integration"
+        prompt_template: |
+          Validate tech steer compliance for {focus}.
+
+          Source of truth: Developer quotes from {output_dir}/technical-decisions.md
+
+          Compare against tasks.md and spec.md.
+
+          Return MAX 10 deviations:
+          ## Tech Steer Compliance: {focus}
+
+          ### Deviations Found
+          1. **DEVIATION**: Developer said "[quote]"
+             - **In tasks.md**: [what the spec says]
+             - **Developer quote**: "[exact quote]"
+             - **Fix**: [how to align with developer guidance]
+        max_findings_per_agent: 10
+        max_iterations: 3
+        completion_criteria:
+          type: "agent_responses"
+          min_agents: 3
+
+      - id: "1.6.2"
+        name: "Apply Tech Steer Fixes"
+        type: "consolidate"
+        source_steps: ["1.6.1"]
+        prompt: |
+          Apply tech steer fixes from all agents.
+
+          Ensure specs align with explicit developer guidance.
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 3
+
+      - id: "1.6.3"
+        name: "Second Tech Steer Batch"
+        type: "agents"
+        parallel: true
+        agent_count: 3
+        reuse_config: "1.6.1"
+        completion_criteria:
+          type: "no_issues"
+        on_issues: "goto:1.6.4"
+
+      - id: "1.6.4"
+        name: "Third Tech Steer Batch"
+        type: "agents"
+        parallel: true
+        agent_count: 3
+        reuse_config: "1.6.1"
+        optional: true
+        on_issues: "flag_for_review"
+
+# =============================================================================
+# PHASE 1.7: Final Spec Validation
+# =============================================================================
+  - id: "1.7"
+    name: "Final Spec Validation"
+    description: "Run full validation with 11 review agents"
+    depends_on: ["1.6"]
+
+    steps:
+      - id: "1.7.1"
+        name: "Run Validate Spec"
+        type: "skill"
+        skill: "validate-spec"
+        args: "{change_id}"
+        prompt: |
+          Run the validate-spec skill on the change.
+
+          This will:
+          1. Launch 11 review agents in parallel
+          2. Collect JSON suggestions from each
+          3. Consolidate and dedupe
+          4. Auto-apply CRITICAL/HIGH suggestions
+          5. Ask about MEDIUM/LOW suggestions
+          6. Inject ## 99. Validation section
+
+          When complete, output: <promise>STEP_COMPLETE</promise>
+        max_iterations: 10
+
+# =============================================================================
+# APPROVAL: User Approval Checkpoint
+# =============================================================================
+  - id: "approval"
+    name: "Approval Checkpoint"
+    description: "Present proposal for final approval"
+    depends_on: ["1.7"]
+
+    steps:
+      - id: "approval.1"
+        name: "Present Proposal Summary"
+        type: "checkpoint"
+        gate: "approval"
+        stop_gate: true
+        prompt: |
+          ## Proposal Ready for Approval
+
+          **Change**: {change_id}
+          **Feature**: {feature_description}
+
+          **Documents Created**:
+          - {output_dir}/prd.md - Product requirements
+          - {output_dir}/proposal.md - Technical proposal
+          - {output_dir}/tasks.md - Implementation tasks
+          - {output_dir}/technical-decisions.md - Your answers
+          - {output_dir}/specs/*/spec.md - Spec deltas
+
+          **Validation**:
+          - Accuracy: {accuracy_status}
+          - Tech Steer: {tech_steer_status}
+          - Final Review: {final_review_status}
+
+          Please review and respond:
+          - "Approved" / "LGTM" / "Proceed" → Continue to implementation
+          - "Rejected" / "Changes needed: [describe]" → I'll update
+        required_keywords: ["approved", "lgtm", "proceed"]
+        on_rejected: "goto:1"
+        on_approved: "goto:2"
+
+# =============================================================================
+# PHASE 2: Implementation
+# =============================================================================
+  - id: "2"
+    name: "Implementation"
+    description: "Execute tasks from tasks.md"
+    depends_on: ["approval"]
+
+    steps:
+      - id: "2.1"
+        name: "Execute Tasks"
+        type: "task_runner"
+        task_file: "{output_dir}/tasks.md"
+        incremental_review: true
+        # Gate checks run after step completion (typecheck + lint)
+        gate_checks:
+          type: "typecheck-lint"
+          on_failure: "block"
+        review_triggers:
+          - pattern: "apps/api/"
+            agents: ["architecture-reviewer", "security-reviewer", "type-safety-reviewer"]
+          - pattern: "*.tsx"
+            agents: ["performance-reviewer", "accessibility-reviewer", "patterns-reviewer"]
+          - pattern: "locales/"
+            agents: ["i18n-reviewer"]
+          - pattern: "__tests__/"
+            agents: ["testing-reviewer"]
+        prompt: |
+          Execute tasks from {output_dir}/tasks.md sequentially.
+
+          For each task:
+          1. Read the task description
+          2. Implement the change
+          3. Mark task as [x] when complete
+          4. If task matches review triggers, run targeted agents
+          5. Fix any CRITICAL/ERROR issues before proceeding
+
+          After completing all tasks, complete ## 99. Validation section.
+
+          NOTE: Gate checks (typecheck + lint) will run automatically after this step.
+          Fix any issues before the workflow advances to the next phase.
+
+          When ALL tasks complete and validation passes:
+          <promise>STEP_COMPLETE</promise>
+        max_iterations: 100
+
+# =============================================================================
+# PHASE 3: Archive
+# =============================================================================
+  - id: "3"
+    name: "Archive"
+    description: "Archive the completed change"
+    depends_on: ["2"]
+    trigger: "manual"
+
+    steps:
+      - id: "3.1"
+        name: "Archive Change"
+        type: "command"
+        prompt: |
+          Archive the completed change:
+
+          Run: openspec archive {change_id} --yes
+
+          This will:
+          1. Move {output_dir}/ to changes/archive/
+          2. Update specs if needed
+          3. Validate the archive
+
+          When complete, output: <promise>WORKFLOW_COMPLETE</promise>
+        max_iterations: 2
