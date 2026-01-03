@@ -259,6 +259,66 @@ Run after all subtasks are complete:
 2. Claude can see what's done when the prompt is re-injected
 3. Users can see progress at a glance
 
+## Phase 6: Initialize Memory System
+
+Create a `memory/` directory for session learning:
+
+```bash
+mkdir -p {output_dir}/memory
+```
+
+### Create `{output_dir}/memory/patterns.md`
+
+Initialize with patterns discovered during codebase investigation:
+
+```markdown
+# Code Patterns
+
+Patterns discovered during planning that should be followed during implementation.
+
+## Discovered Patterns
+
+### Pattern: [Name from investigation]
+- **Context**: When to use this pattern
+- **Example**: `path/to/reference/file.ts`
+- **Notes**: Any important details
+
+[Add 2-5 patterns found during Phase 1 investigation]
+```
+
+### Create `{output_dir}/memory/gotchas.md`
+
+Initialize with known issues for this type of work:
+
+```markdown
+# Known Gotchas
+
+Issues to watch out for during implementation.
+
+## From Codebase Investigation
+
+- [Any warnings discovered during investigation]
+- [Known quirks of this codebase]
+
+## Common Issues for {workflow_type} Workflows
+
+- [Typical pitfalls for this type of work]
+```
+
+### Create `{output_dir}/memory/session-log.md`
+
+Initialize empty session log:
+
+```markdown
+# Session Log
+
+Progress tracking across implementation iterations.
+
+---
+
+[Entries will be appended during implementation]
+```
+
 ## Rules
 
 1. **Never skip codebase investigation** - Your plan will be wrong without it

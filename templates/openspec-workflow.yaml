@@ -873,6 +873,15 @@ phases:
         prompt: |
           Execute tasks from {output_dir}/tasks.md sequentially.
 
+          ## Before Starting: Read Memory
+
+          Check for existing learnings from previous iterations:
+          - `{output_dir}/memory/patterns.md` - Patterns to follow
+          - `{output_dir}/memory/gotchas.md` - Issues to avoid
+
+          These contain patterns discovered during planning and lessons from previous
+          implementation iterations. Read them before starting each subtask.
+
           ## Task List Format
 
           The task file uses checkbox format for progress tracking:
@@ -890,13 +899,51 @@ phases:
           ## For Each Task
 
           1. Read the task description (files, patterns, verification)
-          2. Implement the change following patterns from reference files
-          3. Run the verification command
-          4. If verification passes:
+          2. Read memory files for relevant patterns/gotchas
+          3. Implement the change following patterns from reference files
+          4. Run the verification command
+          5. If verification passes:
              - Change `- [ ]` to `- [x]`
              - Update the **Completed** counter
-          5. If task matches review triggers, run targeted agents
-          6. Fix any CRITICAL/ERROR issues before proceeding
+          6. If task matches review triggers, run targeted agents
+          7. Fix any CRITICAL/ERROR issues before proceeding
+
+          ## Self-Critique Before Marking Complete
+
+          Before changing `[ ]` to `[x]`, verify:
+          - [ ] Follows patterns from reference files and memory/patterns.md
+          - [ ] Error handling in place
+          - [ ] No console.log/debug statements left
+          - [ ] Verification command passes
+
+          If any fail, fix before marking complete.
+
+          ## Document Learnings
+
+          After completing each subtask, update memory files:
+
+          1. **If you discovered a useful pattern**, append to `{output_dir}/memory/patterns.md`:
+             ```
+             ### Pattern: [Name]
+             - **Context**: When to use
+             - **Example**: Code snippet or file reference
+             ```
+
+          2. **If you encountered a gotcha**, append to `{output_dir}/memory/gotchas.md`:
+             ```
+             ### Gotcha: [Issue]
+             - **Symptom**: What went wrong
+             - **Fix**: How to avoid
+             ```
+
+          3. **Log progress** by appending to `{output_dir}/memory/session-log.md`:
+             ```
+             ### Subtask X.X Complete
+             - Files: [list]
+             - Verification: [passed/notes]
+             - Patterns used: [any from memory]
+             - New learnings: [if any]
+             ```
 
           ## After All Tasks
 

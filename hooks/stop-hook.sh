@@ -127,6 +127,42 @@ get_task_progress() {
   fi
 }
 
+# Get memory stats from memory directory
+# Returns: "Patterns: X | Gotchas: Y" or empty string
+get_memory_stats() {
+  local state_file="$1"
+  local output_dir
+  output_dir=$(parse_state_field "$state_file" "output_dir")
+
+  local memory_dir="${output_dir}/memory"
+  local patterns_file="${memory_dir}/patterns.md"
+  local gotchas_file="${memory_dir}/gotchas.md"
+
+  if [[ ! -d "$memory_dir" ]]; then
+    echo ""
+    return
+  fi
+
+  local patterns_count=0
+  local gotchas_count=0
+
+  # Count patterns (### Pattern: headers)
+  if [[ -f "$patterns_file" ]]; then
+    patterns_count=$(grep -c "^### Pattern:" "$patterns_file" 2>/dev/null || echo 0)
+  fi
+
+  # Count gotchas (### Gotcha: headers)
+  if [[ -f "$gotchas_file" ]]; then
+    gotchas_count=$(grep -c "^### Gotcha:" "$gotchas_file" 2>/dev/null || echo 0)
+  fi
+
+  if [[ $patterns_count -gt 0 ]] || [[ $gotchas_count -gt 0 ]]; then
+    echo "Memory: ${patterns_count}P/${gotchas_count}G"
+  else
+    echo ""
+  fi
+}
+
 # ============================================================================
 # MAIN LOGIC
 # ============================================================================
@@ -355,12 +391,16 @@ Once all gate checks pass, the workflow will advance to the next step."
   # Print workflow status banner
   print_workflow_status "$WORKFLOW_NAME" "$DISPLAY_PHASE" "$NEXT_STEP" "$NEXT_STEP_NAME" "1" "$STEP_MAX" "$TOTAL_ITERATIONS"
 
-  # Build system message with task progress
+  # Build system message with task progress and memory stats
   TASK_PROGRESS=$(get_task_progress "$ACTIVE_STATE_FILE")
+  MEMORY_STATS=$(get_memory_stats "$ACTIVE_STATE_FILE")
+
+  NEXT_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX)"
   if [[ -n "$TASK_PROGRESS" ]]; then
-    NEXT_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX) | Tasks: $TASK_PROGRESS"
-  else
-    NEXT_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX)"
+    NEXT_SYSTEM_MSG="${NEXT_SYSTEM_MSG} | Tasks: $TASK_PROGRESS"
+  fi
+  if [[ -n "$MEMORY_STATS" ]]; then
+    NEXT_SYSTEM_MSG="${NEXT_SYSTEM_MSG} | $MEMORY_STATS"
   fi
 
   jq -n \
@@ -435,12 +475,16 @@ if [[ $CURRENT_ITERATION -ge $STEP_MAX_ITERATIONS ]]; then
     DISPLAY_PHASE=$(parse_state_field "$ACTIVE_STATE_FILE" "current_phase")
     print_workflow_status "$WORKFLOW_NAME" "$DISPLAY_PHASE" "$NEXT_STEP" "$NEXT_STEP_NAME" "1" "$STEP_MAX" "$TOTAL_ITERATIONS"
 
-    # Build system message with task progress
+    # Build system message with task progress and memory stats
     TASK_PROGRESS=$(get_task_progress "$ACTIVE_STATE_FILE")
+    MEMORY_STATS=$(get_memory_stats "$ACTIVE_STATE_FILE")
+
+    FORCE_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX) [Force advanced]"
     if [[ -n "$TASK_PROGRESS" ]]; then
-      FORCE_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX) [Force advanced] | Tasks: $TASK_PROGRESS"
-    else
-      FORCE_SYSTEM_MSG="Step: $NEXT_STEP - $NEXT_STEP_NAME (iteration 1/$STEP_MAX) [Force advanced from $CURRENT_STEP]"
+      FORCE_SYSTEM_MSG="${FORCE_SYSTEM_MSG} | Tasks: $TASK_PROGRESS"
+    fi
+    if [[ -n "$MEMORY_STATS" ]]; then
+      FORCE_SYSTEM_MSG="${FORCE_SYSTEM_MSG} | $MEMORY_STATS"
     fi
 
     jq -n \
@@ -472,13 +516,17 @@ VARS=$(get_state_variables "$ACTIVE_STATE_FILE")
 # shellcheck disable=SC2086
 STEP_PROMPT=$(substitute_vars "$STEP_PROMPT" $VARS)
 
-# Build system message with task progress
+# Build system message with task progress and memory stats
 STEP_NAME=$(get_step_field "$WORKFLOW_CONFIG" "$CURRENT_STEP" "name")
 TASK_PROGRESS=$(get_task_progress "$ACTIVE_STATE_FILE")
+MEMORY_STATS=$(get_memory_stats "$ACTIVE_STATE_FILE")
+
+SYSTEM_MSG="Step: $CURRENT_STEP - $STEP_NAME (iteration $NEXT_ITERATION/$STEP_MAX_ITERATIONS)"
 if [[ -n "$TASK_PROGRESS" ]]; then
-  SYSTEM_MSG="Step: $CURRENT_STEP - $STEP_NAME (iteration $NEXT_ITERATION/$STEP_MAX_ITERATIONS) | Tasks: $TASK_PROGRESS"
-else
-  SYSTEM_MSG="Step: $CURRENT_STEP - $STEP_NAME (iteration $NEXT_ITERATION/$STEP_MAX_ITERATIONS)"
+  SYSTEM_MSG="${SYSTEM_MSG} | Tasks: $TASK_PROGRESS"
+fi
+if [[ -n "$MEMORY_STATS" ]]; then
+  SYSTEM_MSG="${SYSTEM_MSG} | $MEMORY_STATS"
 fi
 
 # Print iteration status
