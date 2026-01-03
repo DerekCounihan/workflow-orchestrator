@@ -652,18 +652,23 @@ phases:
               - Same dependencies + different files = parallel safe
               - Different services = usually parallel safe
 
-              ## Output
+              ## Output (BOTH files are REQUIRED)
 
               Create two files:
 
               1. `{output_dir}/implementation-plan.json` - Structured JSON plan
-              2. `{output_dir}/tasks.md` - Human-readable task list
+              2. `{output_dir}/tasks.md` - Human-readable task list with checkbox format
 
-              When complete, output: <promise>STEP_COMPLETE</promise>
+              **CRITICAL**: The workflow CANNOT proceed without tasks.md.
+              This file drives the entire implementation phase.
+
+              Verify BOTH files exist before outputting: <promise>STEP_COMPLETE</promise>
         max_iterations: 5
         completion_criteria:
           type: "file_exists"
-          path: "{output_dir}/implementation-plan.json"
+          paths:
+            - "{output_dir}/implementation-plan.json"
+            - "{output_dir}/tasks.md"
 
       - id: "1.4"
         name: "Create Spec Deltas"
